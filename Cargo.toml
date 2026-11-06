@@ -8,7 +8,9 @@ argon2 = "0.6.0"
 askama = "0.16.1"
 axum = "0.8.9"
 axum-extra = { version = "0.12.6", features = ["cookie"] }
+mime_guess = "2.0.5"
 nix = { version = "0.31.3", features = ["signal"] }
+rust-embed = "8.13.0"
 serde = { version = "1.0.229", features = ["derive"] }
 sysinfo = "0.40.1"
 tokio = { version = "1.54.1", features = ["full"] }

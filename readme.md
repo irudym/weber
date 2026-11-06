@@ -21,10 +21,12 @@ Weber is a small web app for running and controlling services on a remote Linux 
 ## Installation
 
 ```bash
-git clone https://github.com/<your-user>/weber.git
+git clone https://github.com/irudym/weber.git
 cd weber
-# build command here
-cargo build
+# build frontend at first 
+cd frontend && npm ci && npm run build
+# build the main app
+cargo build --release
 ```
 
 ## Configuration
@@ -111,7 +113,23 @@ sudo systemctl enable --now weber
 journalctl -u weber -f                 # follow the logs
 ```
 
+## Development with hot reload
+run 
+```bash
+npm run dev
+````
+in frontend/
 
+## Creating release builds
+Run
+```bash
+npm run build
+```
+in frontend/ first, then 
+```bash
+cargo build --release
+```
+rust-embed takes whatever is in frontend/dist/ at that moment.
 
 
 ## Security notes

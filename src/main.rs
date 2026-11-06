@@ -1,5 +1,6 @@
 mod auth;
 mod procs;
+mod spa;
 
 use std::sync::Arc;
 
@@ -94,7 +95,6 @@ async fn main() {
     });
 
     let protected = Router::new()
-        .route("/", get(index))
         .route("/api/status", get(procs::status))
         .route("/api/start/{name}", post(procs::start))
         .route("/api/stop/{name}", post(procs::stop))
@@ -109,6 +109,7 @@ async fn main() {
         .route("/logout", post(auth::logout))
         .route("/assets/vt323.woff2", get(font))
         .merge(protected)
+        .fallback(spa::static_handler) //everything else: Svelte app
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(state);
 
