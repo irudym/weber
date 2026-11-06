@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a0b3d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>weber</title>
+  <link rel="preload" href="/assets/vt323.woff2" as="font" type="font/woff2" crossorigin>
+  <style>{% include "style.css" %}</style>
+</head>
+<body>
+  <div class="scene" aria-hidden="true"><div class="sun"></div><div class="floor"></div></div>
+
+  <main class="dash" id="top">
+    <header class="dash-header">
+      <h1 class="wordmark">weber</h1>
+      <p class="tagline" id="summary">Checking processes…</p>
+    </header>
+
+    <section class="proc-list" id="procs" aria-label="Processes"></section>
+  </main>
+
+  <!-- Taskbar: always at the bottom, clear of the iPhone home indicator -->
+  <footer class="taskbar">
+    <a class="btn task-home" href="#top">{% include "icons/logo.svg" %}<span>weber</span></a>
+    <div class="tray">
+      <span class="tray-user">{{ user }}</span>
+      <time id="clock"></time>
+    </div>
+    <form method="post" action="/logout">
+      <button class="btn" type="submit" aria-label="Log out">
+        {% include "icons/logout.svg" %}<span class="hide-sm">Log out</span>
+      </button>
+    </form>
+  </footer>
+
+  <!-- One window per process, cloned by the script -->
+  <template id="card-tpl">
+    <article class="window proc">
+      <div class="titlebar">
+        <span class="led" data-f="led"></span>
+        <h2 class="titlebar-text" data-f="name"></h2>
+      </div>
+      <div class="window-body">
+        <dl class="stats">
+          <dt>Status</dt><dd data-f="state"></dd>
+          <dt>PID</dt><dd data-f="pid"></dd>
+          <dt>CPU</dt><dd><span class="meter" data-f="meter" aria-hidden="true"></span><span data-f="cpu"></span></dd>
+          <dt>Memory</dt><dd data-f="mem"></dd>
+        </dl>
+        <div class="actions">
+          <button class="btn" type="button" data-act="start">{% include "icons/play.svg" %}Start</button>
+          <button class="btn" type="button" data-act="stop">{% include "icons/stop.svg" %}Stop</button>
+          <button class="btn" type="button" data-act="logs">{% include "icons/logs.svg" %}Logs<span class="badge" data-f="badge" hidden></span></button>
+        </div>
+        <p class="note" data-f="note" aria-live="polite"></p>
+      </div>
+    </article>
+  </template>
+
+  <!-- Log viewer: full screen on phones, a window on larger screens -->
+  <div class="overlay" id="overlay" hidden>
+    <section class="window log-window" role="dialog" aria-modal="true" aria-labelledby="log-title">
+      <div class="titlebar">
+        {% include "icons/logs.svg" %}
+        <h2 class="titlebar-text" id="log-title"></h2>
+        <button class="btn btn-icon" type="button" id="log-close" aria-label="Close logs">{% include "icons/close.svg" %}</button>
+      </div>
+
+      <div class="tabs" role="tablist">
+        <button class="tab" type="button" role="tab" data-tab="all" aria-selected="true">All output</button>
+        <button class="tab" type="button" role="tab" data-tab="err" aria-selected="false">Errors <span id="err-count"></span></button>
+      </div>
+
+      <div class="terminal" id="term" role="log" tabindex="0"></div>
+
+      <div class="log-footer">
+        <label class="check"><input type="checkbox" id="follow" checked>Follow new lines</label>
+        <span class="line-count" id="line-count"></span>
+      </div>
+    </section>
+  </div>
+
+  <script>
+  {% raw %}
+  const $ = (sel, root = document) => root.querySelector(sel);
+  const cards = new Map();   // process name -> card element
+
+  // ---------- helpers ----------
+  async function api(url, opts) {
+    const res = await fetch(url, opts);
+    if (res.status === 401) {            // session expired or logged out elsewhere
+      location.href = '/login';
+      throw new Error('unauthorized');
+    }
+    return res;
+  }
+
+  function formatBytes(b) {
+    if (b >= 1073741824) return (b / 1073741824).toFixed(1) + ' GB';
+    if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+    return Math.round(b / 1024) + ' KB';
+  }
+
+  function formatTime(ms) {
+    return new Date(ms).toLocaleTimeString([], { hour12: false });
+  }
+
+  // ---------- process windows ----------
+  function createCard(name) {
+    const card = $('#card-tpl').content.firstElementChild.cloneNode(true);
+    card.querySelector('[data-f="name"]').textContent = name;
+    const meter = card.querySelector('[data-f="meter"]');
+    for (let i = 0; i < 10; i++) meter.appendChild(document.createElement('i'));
+
+    card.querySelector('[data-act="start"]').onclick = () => act(card, 'start', name);
+    card.querySelector('[data-act="stop"]').onclick = () => act(card, 'stop', name);
+    card.querySelector('[data-act="logs"]').onclick = (e) => openLogs(name, e.currentTarget);
+
+    $('#procs').appendChild(card);
+    cards.set(name, card);
+    return card;
+  }
+
+  function updateCard(p) {
+    const card = cards.get(p.name) || createCard(p.name);
+    const f = (key) => card.querySelector(`[data-f="${key}"]`);
+
+    const failed = !p.running && p.last_exit && p.last_exit !== 'exit code 0';
+    let state = 'Stopped', cls = 'state-stopped';
+    if (p.running) { state = 'Running'; cls = 'state-running'; }
+    else if (p.last_exit === 'exit code 0') { state = 'Finished'; }
+    else if (failed) { state = `Exited, ${p.last_exit}`; cls = 'state-failed'; }
+
+    f('led').className = 'led' + (p.running ? ' on' : failed ? ' err' : '');
+    f('state').textContent = state;
+    f('state').className = cls;
+    f('pid').textContent = p.pid ?? '–';
+    f('cpu').textContent = p.running ? p.cpu.toFixed(1) + '%' : '–';
+    f('mem').textContent = p.running ? formatBytes(p.mem_bytes) : '–';
+
+    const lit = p.running ? Math.round(Math.min(p.cpu, 100) / 10) : 0;
+    [...f('meter').children].forEach((seg, i) => {
+      seg.className = i < lit ? (i >= 7 ? 'lit hot' : 'lit') : '';
+    });
+
+    const badge = f('badge');
+    badge.hidden = p.err_count === 0;
+    badge.textContent = p.err_count > 99 ? '99+' : p.err_count;
+    badge.title = `${p.err_count} error lines since the last start`;
+
+    if (!card.dataset.busy) {
+      card.querySelector('[data-act="start"]').disabled = p.running;
+      card.querySelector('[data-act="stop"]').disabled = !p.running;
+    }
+  }
+
+  async function loadStatus() {
+    const data = await (await api('/api/status')).json();
+    data.forEach(updateCard);
+    const running = data.filter(p => p.running).length;
+    $('#summary').textContent = `${running} of ${data.length} processes running`;
+  }
+
+  async function act(card, action, name) {
+    const note = card.querySelector('[data-f="note"]');
+    card.dataset.busy = '1';
+    card.querySelectorAll('[data-act="start"], [data-act="stop"]').forEach(b => b.disabled = true);
+    note.textContent = action === 'start' ? 'Starting…' : 'Stopping… (up to 5 seconds)';
+    try {
+      const res = await api(`/api/${action}/${name}`, { method: 'POST' });
+      note.textContent = await res.text();
+    } catch (e) {
+      note.textContent = 'No answer from the server. Check that weber is running.';
+    }
+    delete card.dataset.busy;
+    clearTimeout(card._noteTimer);
+    card._noteTimer = setTimeout(() => { note.textContent = ''; }, 6000);
+    loadStatus();
+  }
+
+  // ---------- log viewer ----------
+  const log = { name: null, lines: [], since: 0, tab: 'all', timer: null, opener: null };
+  const MAX_LINES = 2000;
+  const term = $('#term');
+  const follow = $('#follow');
+
+  function lineVisible(l) {
+    return log.tab === 'all' || l.stream === 'err';
+  }
+
+  function lineEl(l) {
+    const row = document.createElement('div');
+    row.className = 'line ' + l.stream;
+    const t = document.createElement('time');
+    t.textContent = formatTime(l.ts_ms);
+    const text = document.createElement('span');
+    text.textContent = l.text;           // textContent: process output is never parsed as HTML
+    row.append(t, text);
+    return row;
+  }
+
+  function renderAll() {
+    term.textContent = '';
+    const shown = log.lines.filter(lineVisible);
+    if (shown.length === 0) {
+      const p = document.createElement('p');
+      p.className = 'terminal-empty';
+      p.textContent = log.tab === 'err'
+        ? 'No errors. Lines the process writes to stderr appear here.'
+        : 'No output yet. Start the process to see what it prints.';
+      term.appendChild(p);
+    } else {
+      shown.forEach(l => term.appendChild(lineEl(l)));
+    }
+    updateCounts();
+    if (follow.checked) term.scrollTop = term.scrollHeight;
+  }
+
+  function appendLines(newLines) {
+    if (newLines.length === 0) return;
+    log.lines.push(...newLines);
+    const overflow = log.lines.length - MAX_LINES;
+    if (overflow > 0) { log.lines.splice(0, overflow); return renderAll(); }
+
+    const shown = newLines.filter(lineVisible);
+    if (shown.length) {
+      $('.terminal-empty', term)?.remove();
+      shown.forEach(l => term.appendChild(lineEl(l)));
+    }
+    updateCounts();
+    if (follow.checked) term.scrollTop = term.scrollHeight;
+  }
+
+  function updateCounts() {
+    const errs = log.lines.filter(l => l.stream === 'err').length;
+    $('#err-count').textContent = errs ? `(${errs})` : '';
+    const shown = log.lines.filter(lineVisible).length;
+    $('#line-count').textContent = shown === 1 ? '1 line' : `${shown} lines`;
+  }
+
+  async function pollLogs() {
+    if (!log.name) return;
+    const name = log.name;
+    try {
+      const data = await (await api(`/api/logs/${name}?since=${log.since}`)).json();
+      if (name !== log.name) return;      // viewer switched while waiting
+      if (data.lines.length) log.since = data.lines[data.lines.length - 1].seq;
+      appendLines(data.lines);
+    } catch (e) { /* try again on the next tick */ }
+  }
+
+  function openLogs(name, opener) {
+    Object.assign(log, { name, lines: [], since: 0, opener });
+    $('#log-title').textContent = `Logs: ${name}`;
+    follow.checked = true;
+    setTab(log.tab);
+    $('#overlay').hidden = false;
+    document.body.style.overflow = 'hidden';
+    $('#log-close').focus();
+    pollLogs();
+    log.timer = setInterval(pollLogs, 1000);
+  }
+
+  function closeLogs() {
+    clearInterval(log.timer);
+    log.name = null;
+    $('#overlay').hidden = true;
+    document.body.style.overflow = '';
+    log.opener?.focus();
+  }
+
+  function setTab(tab) {
+    log.tab = tab;
+    document.querySelectorAll('.tab').forEach(b =>
+      b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+    renderAll();
+  }
+
+  document.querySelectorAll('.tab').forEach(b => b.onclick = () => setTab(b.dataset.tab));
+  $('#log-close').onclick = closeLogs;
+  $('#overlay').addEventListener('click', e => { if (e.target.id === 'overlay') closeLogs(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && log.name) closeLogs(); });
+
+  // Scrolling up pauses following; scrolling back to the bottom resumes it.
+  term.addEventListener('scroll', () => {
+    follow.checked = term.scrollHeight - term.scrollTop - term.clientHeight < 24;
+  }, { passive: true });
+  follow.onchange = () => { if (follow.checked) term.scrollTop = term.scrollHeight; };
+
+  // ---------- taskbar clock ----------
+  function tick() {
+    $('#clock').textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  tick();
+  setInterval(tick, 10000);
+  loadStatus();
+  setInterval(loadStatus, 2000);
+  {% endraw %}
+  </script>
+</body>
+</html>

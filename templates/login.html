@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1a0b3d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Sign in · weber</title>
+  <link rel="preload" href="/assets/vt323.woff2" as="font" type="font/woff2" crossorigin>
+  <style>{% include "style.css" %}</style>
+</head>
+<body>
+  <div class="scene" aria-hidden="true"><div class="sun"></div><div class="floor"></div></div>
+
+  <main class="login-page">
+    <h1 class="wordmark">weber</h1>
+
+    <form class="window login-window" method="post" action="/login">
+      <div class="titlebar">
+        {% include "icons/logo.svg" %}
+        <span class="titlebar-text">Sign in to weber</span>
+      </div>
+
+      <div class="window-body">
+        {% if !error.is_empty() %}
+        <div class="alert" role="alert">
+          {% include "icons/warn.svg" %}
+          <span>{{ error }}</span>
+        </div>
+        {% endif %}
+
+        <label class="field">
+          <span class="field-label">Username</span>
+          <input class="input" name="username" autocomplete="username"
+                 autocapitalize="none" autocorrect="off" spellcheck="false" required autofocus>
+        </label>
+
+        <label class="field">
+          <span class="field-label">Password</span>
+          <input class="input" name="password" type="password" autocomplete="current-password" required>
+        </label>
+
+        <button class="btn btn-primary" type="submit">Sign in</button>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

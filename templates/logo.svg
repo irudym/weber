@@ -1,0 +1,5 @@
+<svg class="logo" width="40" height="40" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+  <rect x="2" y="2" width="36" height="36" rx="9" stroke="currentColor" stroke-width="2.5"/>
+  <polyline points="8,21 14,21 17,13 22,28 25,19 32,19" stroke="currentColor" stroke-width="2.5"
+            stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
