@@ -103,7 +103,7 @@ MONITOR_PASS_HASH=$argon2id$v=19$m=19456,t=2,p=1$...
 RUST_LOG=weber=info
 ```
 
-Than
+Then
 ```bash
 sudo chmod 600 /etc/weber.env          # the hash shouldn't be world-readable
 sudo systemctl daemon-reload
