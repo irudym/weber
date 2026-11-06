@@ -25,6 +25,9 @@ git clone https://github.com/<your-user>/weber.git
 cd weber
 # build command here
 cargo build
+cd frontend
+npm install
+cd ..
 ```
 
 ## Configuration
