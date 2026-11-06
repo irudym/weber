@@ -17,6 +17,7 @@
 
 <!-- Always at the bottom, clear of the iPhone home indicator -->
 <footer class="taskbar">
+    <!-- Add button -->
   <a class="btn task-home" href="#top"><Icon name="logo" /><span>weber</span></a>
   <div class="tray">
     <span class="tray-user">{user}</span>

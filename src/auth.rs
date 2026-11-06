@@ -6,7 +6,7 @@ use std::{
 use argon2::{Argon2, PasswordHash, PasswordVerifier};
 use askama::Template;
 use axum::{
-    Extension, Form,
+    Extension, Form, Json,
     extract::{Request, State},
     http::StatusCode,
     middleware::Next,
@@ -16,7 +16,7 @@ use axum_extra::extract::{
     CookieJar,
     cookie::{Cookie, SameSite},
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 
 use crate::Shared;
@@ -38,6 +38,11 @@ struct Session {
 
 #[derive(Clone)]
 pub struct CurrentUser(pub String);
+
+#[derive(Serialize)]
+pub struct Me {
+    user: String,
+}
 
 impl Auth {
     pub fn from_env() -> Self {
@@ -211,3 +216,9 @@ pub async fn logout(State(st): State<Shared>, jar: CookieJar) -> Response {
 
 /// Lets handlers behind the middleware read the logged-in user.
 pub type User = Extension<CurrentUser>;
+
+pub async fn me(user: User) -> Json<Me> {
+    Json(Me {
+        user: user.0.0.clone(),
+    })
+}

@@ -8,17 +8,11 @@ use axum::{
     Router,
     http::header,
     middleware,
-    response::{IntoResponse, Response},
+    response::IntoResponse,
     routing::{get, post},
 };
 
-use askama::Template;
-use axum::{http::StatusCode, response::Html};
-
-use crate::{
-    auth::{Auth, User},
-    procs::Procs,
-};
+use crate::{auth::Auth, procs::Procs};
 use tracing_subscriber::EnvFilter;
 
 struct AppState {
@@ -26,23 +20,6 @@ struct AppState {
     procs: Procs, // managed child processes
 }
 type Shared = Arc<AppState>;
-
-#[derive(Template)]
-#[template(path = "index.html")]
-struct IndexTemplate {
-    user: String,
-}
-
-async fn index(user: User) -> Response {
-    match (IndexTemplate {
-        user: user.0.0.clone(),
-    })
-    .render()
-    {
-        Ok(html) => Html(html).into_response(),
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
-    }
-}
 
 /// The VT323 pixel font, compiled into the binary (SIL Open Font License,
 /// see assets/VT323-OFL.txt). Public, because the login page needs it too.
@@ -99,6 +76,7 @@ async fn main() {
         .route("/api/start/{name}", post(procs::start))
         .route("/api/stop/{name}", post(procs::stop))
         .route("/api/logs/{name}", get(procs::logs))
+        .route("/api/me", get(auth::me))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_login,
