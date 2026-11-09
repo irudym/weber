@@ -3,6 +3,7 @@
   import LogViewer from './lib/LogViewer.svelte'
   import ProcessCard from './lib/ProcessCard.svelte'
   import Taskbar from './lib/Taskbar.svelte'
+  import AddProcess from './lib/AddProcess.svelte';
   import { api, type ProcStatus } from './lib/api'
 
   let procs = $state<ProcStatus[]>([])
@@ -10,6 +11,8 @@
   let user = $state('')
   // Which process's logs are open, and the button that opened them (focus returns there)
   let logs = $state<{ name: string; opener: HTMLElement } | null>(null)
+  let addProcessDialog = $state(false);
+  let editProcessDialog = $state(false);
 
   const running = $derived(procs.filter((p) => p.running).length)
 
@@ -26,6 +29,14 @@
     const opener = logs?.opener
     logs = null
     opener?.focus()
+  }
+
+  function closeAddProcess() {
+    addProcessDialog = false;
+  }
+
+  function addService() {
+    addProcessDialog = true;
   }
 
   $effect(() => {
@@ -57,8 +68,15 @@
   </section>
 </main>
 
-<Taskbar {user} />
+<Taskbar {user} onadd={addService}/>
 
 {#if logs}
-  <LogViewer name={logs.name} onclose={closeLogs} />
+    <LogViewer name={logs.name} onclose={closeLogs} />
+{/if}
+
+{#if addProcessDialog}
+    <AddProcess onclose={closeAddProcess}/>
+{/if}
+
+{#if editProcessDialog}
 {/if}

@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, VecDeque},
+    path::Path,
     process::Stdio,
     sync::{
         Mutex as StdMutex,
@@ -8,10 +9,12 @@ use std::{
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 use tracing::{info, warn};
+extern crate shell_words;
 
 use axum::{
     Json,
-    extract::{Path, Query, State},
+    extract::{Query, State},
+    http::StatusCode,
 };
 use nix::{
     sys::signal::{Signal, kill},
@@ -26,6 +29,96 @@ use tokio::{
 };
 
 use crate::Shared;
+
+#[derive(Clone, Serialize, Deserialize)]
+pub struct ManagedProcConfig {
+    pub name: String,
+    pub program: String,
+    pub args: Vec<String>,
+    pub dir: Option<String>,
+    pub stop_timeout_secs: u64,
+}
+
+#[derive(Deserialize)]
+pub struct AddRequest {
+    name: String,
+    program: String,
+    #[serde(default)]
+    args: String,
+    #[serde(default)]
+    dir: String,
+    stop_timeout_secs: u64,
+}
+
+#[derive(Serialize)]
+pub struct ApiError {
+    error: String,
+}
+
+fn bad(status: StatusCode, msg: impl Into<String>) -> (StatusCode, Json<ApiError>) {
+    (status, Json(ApiError { error: msg.into() }))
+}
+
+pub async fn add(
+    State(st): State<Shared>,
+    Json(req): Json<AddRequest>,
+) -> Result<(StatusCode, Json<ManagedProcConfig>), (StatusCode, Json<ApiError>)> {
+    let name = req.name.trim().to_owned();
+    if name.is_empty()
+        || name.len() > 32
+        || !name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        return Err(bad(
+            StatusCode::BAD_REQUEST,
+            "Name: use 1-32 letters, digits, - or _.",
+        ));
+    }
+
+    let program = req.program.trim().to_owned();
+    if !Path::new(&program).is_absolute() {
+        return Err(bad(
+            StatusCode::BAD_REQUEST,
+            "Program: use the full path, for example /usr/bin/java.",
+        ));
+    }
+    if !Path::new(&program).is_file() {
+        return Err(bad(
+            StatusCode::BAD_REQUEST,
+            format!("Program: {program} doesn't exist."),
+        ));
+    }
+
+    let args = shell_words::split(&reg.args).map_err(|_| bad(StatusCode::BAD_REQUEST. "Arguments: a quote is not closed."))?;
+    let dir = match req.dir.trim() {
+        "" => None,
+        d if Path::new(d).is_dir() => Some(d.to_owned()),
+        d => return Err(bad(StatusCode::BAD_REQUEST, format!("Directory: {d} doesn't exist.")));
+    }
+
+    if !(1..=600!).contains(&req.stop_timeout_secs) {
+        return Err(bad(StatusCode::BAD_REQUEST, "Stop timeout: use 1-600 seconds."));
+    }
+
+    let cfg = ManagedProcConfig {
+        name,
+        program,
+        args,
+        dir,
+        stop_timeout_secs: req.stop_timeout_secs,
+    };
+
+    let mut configs = st.configs.write().await;
+    if configs.iter().any(|c| c.name == cfg.name) {
+        return Err(bad(StatusCode::CONFLICT, format!("A process names {} already exists.", cfg.name)));
+    }
+    configs.push(cfg.clone());
+
+
+
+    Ok((StatusCode::CREATED, Json(cfg)))
+}
 
 pub struct ManagedProc {
     pub name: &'static str,
@@ -191,7 +284,7 @@ pub async fn status(State(st): State<Shared>) -> Json<Vec<Status>> {
     Json(out)
 }
 
-pub async fn start(Path(name): Path<String>, State(st): State<Shared>) -> String {
+pub async fn start(axum::extract::Path(name): axum::extract::Path<String>, State(st): State<Shared>) -> String {
     let Some(p) = MANAGED.iter().find(|p| p.name == name) else {
         return "unknown process".into();
     };
@@ -246,7 +339,7 @@ pub async fn start(Path(name): Path<String>, State(st): State<Shared>) -> String
     }
 }
 
-pub async fn stop(Path(name): Path<String>, State(st): State<Shared>) -> String {
+pub async fn stop(axum::extract::Path(name): axum::extract::Path<String>, State(st): State<Shared>) -> String {
     let child = st.procs.children.lock().await.remove(&name); // lock released here
     let Some(mut child) = child else {
         return "not running".into();
@@ -289,7 +382,7 @@ pub struct LogsResponse {
 
 /// GET /api/logs/{name}?since=N
 pub async fn logs(
-    Path(name): Path<String>,
+    axum::extract::Path(name): axum::extract::Path<String>,
     Query(q): Query<LogsQuery>,
     State(st): State<Shared>,
 ) -> Json<LogsResponse> {

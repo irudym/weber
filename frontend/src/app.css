@@ -238,6 +238,26 @@ button, input { font: inherit; color: inherit; }
   padding: 0;
 }
 
+.input {
+  width: 100%;
+  min-height: 44px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 24px;               /* >= 16px: iOS won't zoom on focus */
+  box-shadow: var(--bevel-in), 0 0 0 2px var(--ink);
+  -webkit-appearance: none;
+  appearance: none;
+  margin-bottom: 18px;
+}
+
+.input:focus {
+  outline: 2px solid var(--surf);
+  outline-offset: 2px;
+}
+
 /* ------------------------------------------------------------------
    Dashboard
    ------------------------------------------------------------------ */

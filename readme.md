@@ -59,7 +59,7 @@ export MONITOR_PASS_HASH='<hash from hash-password>'
 ./weber
 ```
 
-For example, for test purposes the service may be satrted as following:
+For example, for test purposes the service may be started as following:
 ```bash
 HASH=$(echo 'your-password' | /opt/weber/weber hash-password)
 
@@ -119,6 +119,16 @@ run
 npm run dev
 ````
 in frontend/
+then go to the main directory (cd..) and run
+```bash
+HASH=$(echo 'your-password' | cargo run hash-password)
+MONITOR_USER=admin \
+  MONITOR_PASS_HASH="$HASH" \
+  MONITOR_INSECURE_COOKIE=1 \
+  RUST_LOG=weber=debug,tower_http=info \
+  cargo run
+```
+
 
 ## Creating release builds
 Run

@@ -1,4 +1,5 @@
 mod auth;
+mod config;
 mod procs;
 mod spa;
 
@@ -11,13 +12,18 @@ use axum::{
     response::IntoResponse,
     routing::{get, post},
 };
+use tokio::sync::RwLock;
 
-use crate::{auth::Auth, procs::Procs};
+use crate::{
+    auth::Auth,
+    procs::{ManagedProcConfig, Procs},
+};
 use tracing_subscriber::EnvFilter;
 
 struct AppState {
     auth: Auth,   // credentials + active sessions
     procs: Procs, // managed child processes
+    configs: RwLock<Vec<ManagedProcConfig>>,
 }
 type Shared = Arc<AppState>;
 
@@ -69,6 +75,7 @@ async fn main() {
     let state = Arc::new(AppState {
         auth: Auth::from_env(),
         procs: Procs::new(),
+        configs: RwLock::new(Vec::new()), // TODO: load from file
     });
 
     let protected = Router::new()
