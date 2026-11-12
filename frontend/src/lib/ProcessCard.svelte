@@ -1,6 +1,9 @@
 <script lang="ts">
-  import Icon from './Icon.svelte'
-  import { api, formatBytes, type ProcStatus } from './api'
+    import ConfirmDialog from './ConfirmDialog.svelte';
+    import Icon from './Icon.svelte';
+    import ProcessForm from './ProcessForm.svelte';
+    import ToolButton from './ToolButton.svelte';
+    import { api, formatBytes, type ProcStatus, joinArgs } from './api';
 
   let {
     proc,
@@ -15,6 +18,9 @@
   let busy = $state(false)
   let note = $state('')
   let noteTimer: ReturnType<typeof setTimeout> | undefined
+  let dialog = $state<'edit' | 'delete' | null>(null)
+
+  const command = $derived([proc.config.program, joinArgs(proc.config.args)].filter(Boolean).join(' '))
 
   // $derived values recompute automatically whenever `proc` changes
   const failed = $derived(!proc.running && !!proc.last_exit && proc.last_exit !== 'exit code 0')
@@ -37,24 +43,44 @@
     note = action === 'start' ? 'Starting…' : 'Stopping…'
     try {
       const res = await api(`/api/${action}/${encodeURIComponent(proc.name)}`, { method: 'POST' })
-      note = await res.text()
+
+      showNote(await res.text());
     } catch {
-      note = 'No answer from the server. Check that weber is running.'
+      showNote('No answer from the server. Check that weber is running.');
     }
     busy = false
-    clearTimeout(noteTimer)
-    noteTimer = setTimeout(() => (note = ''), 6000)
     onchange()
   }
 
   // Stop the note timer if the card is removed
   $effect(() => () => clearTimeout(noteTimer))
+
+  async function remove(): Promise<string | null> {
+    try {
+      const res = await api(`/api/processes/${encodeURIComponent(proc.name)}`, {method: 'DELETE'});
+      if (!res.ok) return (await res.json().catch(() => null))?.error ?? `The server answered: ${res.status}.`
+      onchange();
+      return null;
+    } catch {
+      return 'No answer from the server. Check the service is running.';
+    }
+  }
+
+  function showNote(text: string) {
+    note = text;
+    clearTimeout(noteTimer);
+    noteTimer = setTimeout(() => (note = ''), 6000);
+  }
 </script>
 
 <article class="window proc">
   <div class="titlebar">
     <span class="led" class:on={proc.running} class:err={failed}></span>
     <h2 class="titlebar-text">{proc.name}</h2>
+    <!-- Caption buttons -->
+    <ToolButton title="Edit" label={proc.name} icon="edit" onclick={() => (dialog = 'edit')} />
+    <ToolButton title="Delete" label={proc.name} icon="trash" onclick={() => (dialog = 'delete')} />
+
   </div>
 
   <div class="window-body">
@@ -76,6 +102,9 @@
 
       <dt>Memory</dt>
       <dd>{proc.running ? formatBytes(proc.mem_bytes) : '–'}</dd>
+
+      <dt>Command</dt>
+      <dd class="cmd" title={command}>{command}</dd>
     </dl>
 
     <div class="actions">
@@ -98,3 +127,16 @@
     <p class="note" aria-live="polite">{note}</p>
   </div>
 </article>
+
+<!-- Dialog -->
+{#if dialog === 'edit'}
+    <ProcessForm onclose={() => (dialog = null)} onsaved={()=> { showNote('Saved.'); onchange();}} initial={proc.config} running={proc.running}/>
+{:else if dialog==='delete'}
+    <ConfirmDialog
+        title="Delete {proc.name}"
+        confirmLabel={proc.running ? "Stop and delete" : "Delete"}
+        danger
+        onconfirm={remove}
+        onclose={() => (dialog = null)}
+    />
+{/if}

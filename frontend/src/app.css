@@ -101,6 +101,7 @@ button, input { font: inherit; color: inherit; }
   box-shadow: 0 -6px 24px rgba(255, 113, 206, .6);
 }
 
+
 .floor::before {
   content: "";
   position: absolute;
@@ -117,7 +118,6 @@ button, input { font: inherit; color: inherit; }
   background-size: 56px 56px;
   -webkit-mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, #000 75%);
   mask-image: linear-gradient(180deg, transparent 0%, transparent 35%, #000 75%);
-  animation: drive 2.4s linear infinite;
 }
 
 @keyframes drive {
@@ -188,7 +188,37 @@ button, input { font: inherit; color: inherit; }
 .window-body { padding: 14px 12px 12px; }
 
 /* ------------------------------------------------------------------
-   Buttons and inputs
+   Compact dialogs (forms and confirmations)
+   ------------------------------------------------------------------ */
+
+.overlay.compact { padding: 12px; }
+
+.dialog-window {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: 440px;
+  max-height: 100%;             /* long forms scroll inside the window */
+}
+
+.dialog-content {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px 12px 12px;
+}
+
+.dialog-message p { margin: 0 0 12px; }
+
+.dialog-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+
+/* ------------------------------------------------------------------
+   Buttons and inputs, forms
    ------------------------------------------------------------------ */
 
 .btn {
@@ -232,6 +262,14 @@ button, input { font: inherit; color: inherit; }
   box-shadow: inset -2px -2px 0 #b03a8a, inset 2px 2px 0 #ffd3ee, 0 0 0 2px var(--ink);
 }
 
+.btn-danger {
+  background: var(--alarm);
+  color: #fff;
+  box-shadow: inset -2px -2px 0 #a3123f, inset 2px 2px 0 #ff9ab5, 0 0 0 2px var(--ink);
+}
+
+.btn-danger:focus-visible { outline-color: #fff; }
+
 .btn-icon {
   min-width: 36px;
   min-height: 30px;
@@ -257,6 +295,23 @@ button, input { font: inherit; color: inherit; }
   outline: 2px solid var(--surf);
   outline-offset: 2px;
 }
+
+.field { display: block; margin-bottom: 14px; }
+
+.field-label { display: block; margin-bottom: 4px; }
+
+.alert {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+  padding: 8px 10px;
+  background: var(--paper);
+  color: #a3123f;
+  box-shadow: var(--bevel-in);
+}
+
+.alert svg { flex: none; margin-top: 2px; }
 
 /* ------------------------------------------------------------------
    Dashboard

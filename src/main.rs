@@ -10,13 +10,15 @@ use axum::{
     http::header,
     middleware,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post, put},
 };
 use tokio::sync::RwLock;
+use tracing::{info, warn};
 
 use crate::{
     auth::Auth,
-    procs::{ManagedProcConfig, Procs},
+    config::{ManagedProcConfig, load_configs},
+    procs::Procs,
 };
 use tracing_subscriber::EnvFilter;
 
@@ -70,12 +72,14 @@ async fn main() {
         .with_target(false)
         .init();
 
-    tracing::error!("logging works"); // temporary test line
+    info!("Load configurations...");
+    let configs = load_configs().await.unwrap();
+    info!("{} records loaded.", configs.len());
 
     let state = Arc::new(AppState {
         auth: Auth::from_env(),
         procs: Procs::new(),
-        configs: RwLock::new(Vec::new()), // TODO: load from file
+        configs: RwLock::new(configs),
     });
 
     let protected = Router::new()
@@ -84,6 +88,9 @@ async fn main() {
         .route("/api/stop/{name}", post(procs::stop))
         .route("/api/logs/{name}", get(procs::logs))
         .route("/api/me", get(auth::me))
+        .route("/api/processes", post(procs::add))
+        .route("/api/processes/{name}", delete(procs::delete))
+        .route("/api/processes/{name}", put(procs::update_with_restart))
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             auth::require_login,
@@ -98,9 +105,9 @@ async fn main() {
         .layer(tower_http::trace::TraceLayer::new_for_http())
         .with_state(state);
 
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:3000")
-        .await
-        .unwrap();
-    println!("http://127.0.0.1:3000");
+    let addr = "127.0.0.1:3000";
+    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    info!("Server started: {}", addr);
+
     axum::serve(listener, app).await.unwrap();
 }

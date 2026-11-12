@@ -45,7 +45,7 @@
 
 <!-- Clicking the dimmed area closes the viewer; keyboard users have Escape and the close button -->
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<Modal title="Logs {name}" icon="logs" onclose={onclose}>
+<Modal title="Logs {name}" icon="logs" onclose={onclose} overlayclick>
     <div class="tabs" role="tablist">
       <button class="tab" type="button" role="tab" aria-selected={tab === 'all'} onclick={() => (tab = 'all')}>
         All output

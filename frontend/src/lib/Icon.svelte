@@ -7,8 +7,11 @@
   import play from './icons/play.svg?raw'
   import stop from './icons/stop.svg?raw'
   import add from './icons/add.svg?raw'
+  import edit from './icons/edit2.svg?raw'
+  import trash from  './icons/delete.svg?raw'
 
-  const icons = { close, logo, logout, logs, play, stop, add }
+
+  const icons = { close, logo, logout, logs, play, stop, add, edit, trash }
   export type IconName = keyof typeof icons
 </script>
 

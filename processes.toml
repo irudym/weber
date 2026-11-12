@@ -1,0 +1,13 @@
+[[process]]
+name = "minecraft"
+program = "java"
+args = ["-Xms1G", "-Xmx1G", "-jar", "paper.jar", "--nogui"]
+dir = "/opt/minecraft"
+stop_timeout_secs = 90
+
+[[process]]
+name = "test"
+program = "/usr/bin/java"
+args = ["-Xxm255"]
+dir = "/home"
+stop_timeout_secs = 5

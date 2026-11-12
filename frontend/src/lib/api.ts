@@ -1,5 +1,14 @@
 // Types matching the JSON that weber's Rust handlers send.
 
+
+export type ProcConfig = {
+  name: string,
+  program: string,
+  args: string[],
+  dir: string | null,
+  stop_timeout_secs: number,
+}
+
 export type ProcStatus = {
   name: string
   pid: number | null
@@ -8,6 +17,7 @@ export type ProcStatus = {
   mem_bytes: number
   err_count: number
   last_exit: string | null
+  config: ProcConfig,
 }
 
 export type LogLine = {
@@ -15,6 +25,10 @@ export type LogLine = {
   ts_ms: number
   stream: 'out' | 'err' | 'sys'
   text: string
+}
+
+export function joinArgs(args: string[]): string {
+  return args.map((a) => (a === '' || /[\s"'\\]/.test(a) ? `"${a.replace(/["\\]/g, '\\$&')}"` : a)).join(' ');
 }
 
 /** fetch() that sends the user to the login page when the session is gone. */

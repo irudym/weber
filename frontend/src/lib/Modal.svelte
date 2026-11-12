@@ -1,12 +1,12 @@
 <script lang="ts">
     import Icon, { type IconName } from './Icon.svelte'
     import type { Snippet } from 'svelte'
-    let { title, icon, onclose, children }: { title: string; icon: IconName, onclose: () => void, children?: Snippet } = $props()
+    let { title, icon, onclose, overlayclick=false, children, size = 'full' }: { title: string; icon: IconName, onclose: () => void, overlayclick?: boolean, children?: Snippet, size?: 'full' | 'compact' } = $props()
 
     const titleId = $props.id();
 
     function onOverlayClick(e: MouseEvent) {
-      if (e.target === e.currentTarget) onclose()
+      if (overlayclick && e.target === e.currentTarget) onclose()
     }
 
     let closeBtn = $state<HTMLButtonElement>()
@@ -26,8 +26,8 @@
 
 <!-- Clicking the dimmed area closes the viewer; keyboard users have Escape and the close button -->
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="overlay" onclick={onOverlayClick}>
-  <div class="window log-window" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+<div class="overlay {size}" onclick={onOverlayClick}>
+  <div class="window {size === 'full' ? 'log-window' : 'dialog-window'}" role="dialog" aria-modal="true" aria-labelledby={titleId}>
     <div class="titlebar">
       <Icon name={icon} />
       <h2 class="titlebar-text" id={titleId}>{title}</h2>

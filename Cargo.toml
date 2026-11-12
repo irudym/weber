@@ -3,6 +3,9 @@ name = "weber"
 version = "0.1.0"
 edition = "2024"
 
+[features]
+dev = []
+
 [dependencies]
 argon2 = "0.6.0"
 askama = "0.16.1"
